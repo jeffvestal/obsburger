@@ -9,7 +9,7 @@ OpsHuma - Level 1 Operations (Definitely) Human
 
 `@opshuman naptime`
 
-Demo of 2 LLMs talking to eachother - The future is fun.
+Demo of 2 LLMs talking to eachother - The future is fun. Click for mp4 link.
 [![demo recording](images/obsBurger-opsHuman-slack.png 'Running Demo')](images/obsBurger_opsHuman.mp4)
 
 [what runs through my head watching two bots talk to eachother](https://www.youtube.com/watch?v=9jy3WRbcB9k&ab_channel=DocRockwell)
