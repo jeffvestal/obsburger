@@ -1,7 +1,8 @@
 # obsburger
 
-ObsBurger - Elastic Observability AI Assistant 
-OpsHuma - Level 1 Operations (Definitely) Human
+**ObsBurger** - Elastic Observability AI Assistant 
+
+**OpsHuman** - Level 1 Operations (Definitely) Human
 
 <img src="images/obsburger.png" width="300"> <img src="images/opshuman-nobackground.png" width="300">
 
