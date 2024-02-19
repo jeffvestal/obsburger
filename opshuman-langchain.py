@@ -82,19 +82,12 @@ OpsHuman:"""
 
 PROMPT = PromptTemplate(input_variables=["history", "input"], template=template)
 
-# os.environ['AZURE_OPENAI_DEPLOYMENT'] = creds['AZURE_OPENAI_DEPLOYMENT']
-# os.environ['AZURE_ENDPOINT'] = creds['AZURE_ENDPOINT']
-
 openai = AzureChatOpenAI(
     model_name=creds['AZURE_OPENAI_DEPLOYMENT'],
     azure_endpoint=creds['AZURE_ENDPOINT'],
     azure_deployment=creds['AZURE_OPENAI_DEPLOYMENT'],
     api_key=creds['AZURE_OPENAI_KEY'],
     api_version=creds['OPEN_AI_VERSION']
-
-    # model_name=os.getenv('AZURE_OPENAI_DEPLOYMENT'),
-    # azure_endpoint=os.getenv("AZURE_ENDPOINT"),
-    # azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
 )
 
 conversation_memory = ConversationBufferMemory(ai_prefix="OpsHuman")
@@ -102,10 +95,8 @@ conversation = ConversationChain(
     prompt=PROMPT,
     llm=openai,
     verbose=True,
-    # memory=ConversationBufferMemory(ai_prefix="OpsHuman"),
     memory=conversation_memory
 )
-
 
 
 ##########################################################################################
