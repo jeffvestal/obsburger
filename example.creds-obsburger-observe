@@ -1,0 +1,8 @@
+{
+"bot_oauth_token":"xoxb-xxxxx",
+"bot_signing_secret":"xxxx",
+"app_level_token": "xapp-1-xxxxx",
+"kibana_url":"https://xxxx.gcp.elastic-cloud.com:9243",
+"username":"xxxxx",
+"password":"xxxxx"
+}

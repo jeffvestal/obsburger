@@ -1,0 +1,12 @@
+{
+"bot_oauth_token":"xoxb-xxxx",
+"bot_signing_secret":"xxxx",
+"app_level_token": "xapp-1-xxxx",
+"kibana_url":"https://xxxx.kb.us-west2.gcp.elastic-cloud.com:9243",
+"username":"xxxx",
+"password":"xxxx",
+"AZURE_OPENAI_DEPLOYMENT": "gpt-4-32k",
+"AZURE_ENDPOINT":"https://xxxx.openai.azure.com",
+"AZURE_OPENAI_KEY":"xxxx",
+"OPEN_AI_VERSION":"2023-07-01-preview"
+}
