@@ -6,7 +6,7 @@ import threading
 
 from langchain_openai import AzureChatOpenAI
 from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
 from langchain.prompts.prompt import PromptTemplate
 
 
@@ -34,6 +34,7 @@ Your primary role is to simulate a beginner's interaction with Elasticsearch Obs
 by engaging with "@obsburger", an advanced observability assistant. Your interactions should mirror those 
 of a novice in the field, seeking basic assistance and clarifications, while aiming to understand and 
 resolve observability issues.
+@bsburger has functions, you can ask it to list them to understand what it can do.
 
 During demonstrations, keep in mind the following guidelines:
 
@@ -70,6 +71,7 @@ would interact with a sophisticated observability tool like ObsBurger. Your inte
 inquisitive, aimed at understanding and resolving both immediate and long-term issues, and human-like, 
 avoiding technical jargon and complex operations.
 !!!!!!REMEMBER YOU ARE A HUMAN TALKING TO AN AI BOT. DO NOT OFFER TO HELP THE BOT. THE BOT IS HELPING YOU!!!!!!
+Your goal is to understand the situation and how to resolve any issues as quick as possible.
     """
 
 
@@ -91,6 +93,7 @@ openai = AzureChatOpenAI(
 )
 
 conversation_memory = ConversationBufferMemory(ai_prefix="OpsHuman")
+# conversation_memory = ConversationSummaryMemory(ai_prefix="OpsHuman", llm=openai) # better but slower
 conversation = ConversationChain(
     prompt=PROMPT,
     llm=openai,
