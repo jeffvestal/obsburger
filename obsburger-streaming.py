@@ -206,8 +206,8 @@ def long_running_task(channel_id, user_id, msg, kb_url, ath, conn_id):
                 # print(f"function_return_type: {response_json.get('message').get('message').get('function_return_type')}")
                 # print()
 
+                # For large responses the assistant is going to process, sent as snippet
                 if response_json.get('message').get('message').get('role') == 'user' and response_json.get('message').get('message').get('content') != "[]":
-                    # file_content = io.StringIO(response_json.get('message').get('message').get('content').encode('utf-8'))
                     content_str = response_json.get('message').get('message').get('content')
                     # Try to load the string as JSON and pretty-print it
                     try:
@@ -223,16 +223,30 @@ def long_running_task(channel_id, user_id, msg, kb_url, ath, conn_id):
                     app.client.files_upload(channels=channel_id,
                                             file=file_content,
                                             title="Elastic Observability AI Assistant",
-                                            initial_comment=f"<@{user_id}>: Function _{response_json.get('message').get('message').get('name')}_ Elastic Observability AI Assistant... Processing...",
+                                            initial_comment=f"Function _{response_json.get('message').get('message').get('name')}_ Elastic Observability AI Assistant... Processing...",
                                             filetype="json",
                                             )
                 else:
-                    # Format the message for Slack
-                    content = f"{response_json.get('message').get('message')}"
-                    formatted_message = f'<@{user_id}>: {content}'
-                    converted_text = formatted_message.replace('**', '*')  # Slack markdown conversion
-                    markdown = markdown_blocks_simple(converted_text)
+                    # Should be the final response from the assistant, so @ the user
+                    if response_json.get('message').get('message').get('content') not in ["[]", "", None]:
+                        # Format the message for Slack
+                        content = f"{response_json.get('message').get('message').get('content')}"
+                        formatted_message = f'<@{user_id}>: {content}'
+                        converted_text = formatted_message.replace('**', '*')  # Slack markdown conversion
 
+                    # Intermittent messages from the assistant showing status updates
+                    elif response_json.get('message').get('message').get('role') == 'assistant' and response_json.get('message').get('message').get('function_call') != None:
+                        # Format the message for Slack
+                        role = response_json.get('message').get('message').get('role')
+                        function_name = response_json.get('message').get('message').get('function_call').get('name')
+                        function_arguments = response_json.get('message').get('message').get('function_call').get('arguments')
+
+                        formatted_message = f'{role} is calling function: `{function_name}: {function_arguments}`'
+                        converted_text = formatted_message.replace('**', '*')
+
+
+                    # Convert the message to Slack markdown
+                    markdown = markdown_blocks_simple(converted_text)
                     # Send the message to Slack
                     app.client.chat_postMessage(channel=channel_id, blocks=markdown)
         except json.JSONDecodeError:
