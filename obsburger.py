@@ -20,7 +20,7 @@ def load_credentials(file_path):
 
 
 # Load credentials
-creds = load_credentials('.creds-obsburger-observe')
+creds = load_credentials('.creds-obsburger')
 
 # Replace with your Kibana URL and credentials
 kibana_url = creds['kibana_url']
