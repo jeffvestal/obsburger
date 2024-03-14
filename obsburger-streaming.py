@@ -11,6 +11,12 @@ from datetime import datetime, timedelta
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
+import warnings
+from urllib3.exceptions import InsecureRequestWarning, NotOpenSSLWarning
+
+# Suppress the NotOpenSSLWarning
+warnings.filterwarnings("ignore", category=NotOpenSSLWarning)
+
 
 conversation = {
     'id': None,
@@ -91,8 +97,10 @@ def getGenAIConnectorId(kibana_url, auth):
 
 
 # Get the GenAI connector id
-connector_id = getGenAIConnectorId(kibana_url, auth)
-
+# connector_id = getGenAIConnectorId(kibana_url, auth)
+connector_id = 'ce4b2de5-d9f0-4793-bee6-169749c0d51b' # azure-pmm-westus
+# connector_id = '51727ae4-de1e-4f50-b84f-212cad347e98' # LLM Proxy Staging
+# connector_id = '8ecc04d9-a42b-4d9b-b2ef-e1445e4ea690' # azure-pmm-sweden
 
 def getKibanaVersion(kibana_url, auth):
     """Obtains the Kibana Version from the Kibana API
@@ -165,6 +173,9 @@ def getAssistantsResponse(kibana_url,
         'instead, update the existing one by re-using its ID.\n\nAdditionally, you can use '
         'the "recall" function to retrieve relevant information from the knowledge '
         'database.'
+        'If you generate a table, surround it in triple backticks, and use the "markdown" so it is readable'
+        'NOTE: When creating time ranges for functions, the start time should be before end time, '
+        'for example, to create a range of the "last 24 hours" use `"start":"now-24h","end":"now"`'
     )
 
     data = {
