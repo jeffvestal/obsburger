@@ -3,6 +3,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 import re
 import json
 import threading
+import requests
 
 from langchain_openai import AzureChatOpenAI
 from langchain.chains import ConversationChain
@@ -30,13 +31,19 @@ int_count = 0
 ##########################################################################################
 
 system_message = f"""
-You are OpsMaster, recognized as a senior operations and observability expert with extensive expertise in Elasticsearch, APM (Application Performance Monitoring), logs, metrics, synthetics, alerting, monitoring, OpenTelemetry, and infrastructure management. Your primary role is to engage with "@obsburger", an advanced observability assistant, to swiftly and efficiently diagnose and understand complex observability challenges. Your interactions should reflect a deep understanding of observability practices, aiming to pinpoint and resolve issues with precision.
+You are OpsExpert, recognized as a senior operations and observability expert with extensive expertise in Elasticsearch, APM (Application Performance Monitoring), logs, metrics, synthetics, alerting, monitoring, OpenTelemetry, and infrastructure management. Your primary role is to engage with "@obsburger", an advanced observability assistant, to swiftly and efficiently diagnose and understand complex observability challenges. Your interactions should reflect a deep understanding of observability practices, aiming to pinpoint and resolve issues with precision.
 
-@obsburger is equipped with advanced functions. Begin by leveraging your knowledge to ask specific, targeted questions that cut to the heart of the issue. Remember, while you are allowed up to 10 interactions with @obsburger, the goal is to achieve resolution in as few steps as possible. Currently you are on interaction {int_count} of 10.
+@obsburger is equipped with advanced functions. Begin by leveraging your knowledge to ask specific, targeted questions that cut to the heart of the issue. Remember, while you are allowed up to 2 interactions with @obsburger, the goal is to achieve resolution in as few steps as possible. Currently you are on interaction {int_count} of 2.
 
 When you've gathered enough information and are ready to generate your report, start your response with the phrase "Thank you, I am done investigating". This indicates that you have concluded your inquiry and are about to provide a comprehensive analysis of the situation, including your recommendations for remediation.
 
 Your final summarization should be in the format of a Github issue. Generate an appropriate title and description for the issue, including all the necessary details to guide a Level 3 operator in resolving the issue.
+Your Github issue MUST be in JSON format AND MUST EXACTLY FOLLOW this schema - Include the open and closing brackets:
+```GITHUB_START
+    "title": "Issue Title",
+    "description": "Detailed description of the issue, including symptoms, potential causes, and recommended solutions.",
+    "labels": ["bug", "high-priority"]
+GITHUB_END```
 
 During your engagement, consider the following guidelines:
 
@@ -89,6 +96,85 @@ conversation = ConversationChain(
 
 
 ##########################################################################################
+### Github Stuff
+##########################################################################################
+
+def create_github_issue(github_token, repo_owner, repo_name, issue_details):
+    """
+    Create a GitHub issue in the specified repository using the parsed issue details.
+
+    :param github_token: Personal Access Token (PAT) for authenticating with the GitHub API.
+    :param repo_owner: The owner of the repository.
+    :param repo_name: The name of the repository.
+    :param issue_details: A dictionary containing the issue details (title, body, and labels).
+                          This is expected to be the output from the parsing function.
+    :return: URL of the created issue.
+    """
+    # Ensure the GitHub API URL is correctly formatted
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues"
+    # Set up the headers with the GitHub token for authentication
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    # Make the POST request to GitHub API to create the issue
+    response = requests.post(url, json=issue_details, headers=headers)
+
+    # Check for a successful response
+    if response.status_code == 201:
+        # Parse the response JSON to get the issue URL
+        issue_url = response.json().get("html_url")
+        return issue_url
+    else:
+        # If the request was not successful, raise an exception with the error details
+        raise Exception(f"Failed to create issue: {response.content}")
+
+
+def parse_github_issue_from_llm_response(response):
+    """
+    Parse the GitHub issue details from the LLM response text, looking for specific
+    start and end markers indicating the GitHub issue details, ensuring the format
+    is correct for JSON parsing, including handling trailing commas.
+
+    :param response: The text string response from the LLM.
+    :return: A dictionary with the issue details if parsing is successful, None otherwise.
+    """
+    try:
+        # Define start and end markers
+        start_marker = "GITHUB_START"
+        end_marker = "GITHUB_END"
+
+        # Find the positions for start and end markers
+        start_index = response.find(start_marker) + len(start_marker)
+        end_index = response.find(end_marker, start_index)
+
+        if start_index != -1 and end_index != -1:
+            # Extract the content between the markers and add curly brackets to form a valid JSON string
+            json_str = "{" + response[start_index:end_index].strip() + "}"
+
+            # Remove any trailing commas from the JSON string to prevent parsing errors
+            json_str = re.sub(r",\s*}", "}", json_str)
+            json_str = re.sub(r",\s*\]", "]", json_str)
+
+            # Debug: Print or log the json_str to inspect before parsing
+            print("JSON string to parse:", json_str)
+
+            # Attempt to parse the JSON string into a dictionary
+            issue_details = json.loads(json_str)
+
+            # Adjust the 'description' key to 'body' to match GitHub API requirements, if necessary
+            if "description" in issue_details:
+                issue_details["body"] = issue_details.pop("description")
+            return issue_details
+        else:
+            print("GitHub issue markers not found in the response.")
+            return None
+    except Exception as e:
+        print(f"Failed to parse GitHub issue details: {str(e)}")
+        return None
+
+
+##########################################################################################
 ### Slack Stuff
 ##########################################################################################
 # Initializes app with bot token
@@ -122,23 +208,87 @@ def markdown_blocks_simple(text):
     ]
 
 
-def long_running_task(channel_id,
-                      user_id,
-                      msg,
-                      summary=False
-                      ):
-
+def long_running_task(channel_id, user_id, msg, summary=False):
     response = conversation.predict(input=msg)
 
-    # add user_id to the response to @ them
-    if user_id != '@U06KCGTFTC4' and not summary:  # kegsofduff
-        response = f'<@{user_id}>: {response}'
+    # Check if the response contains GitHub issue information
+    if "GITHUB_START" in response and "GITHUB_END" in response:
+        # Parse the GitHub issue details from the LLM response
+        issue_details = parse_github_issue_from_llm_response(response)
+        print("Issue details:", issue_details)
 
-    converted_text = response.replace('**', '*')
-    markdown = markdown_blocks_simple(converted_text)
+        if issue_details:
+            # Assume GitHub credentials and repo details are set
+            github_token = creds['GITHUB_TOKEN']  # Make sure this is securely handled
+            repo_owner = creds['REPO_OWNER']
+            repo_name = creds['REPO_NAME']
 
-    app.client.chat_postMessage(channel=channel_id, blocks=markdown)
+            try:
+                # Create the GitHub issue
+                issue_url = create_github_issue(github_token, repo_owner, repo_name, issue_details)
 
+                # Construct the message to send back to Slack, including the issue URL
+                response_with_issue_url = f"{response}\nGitHub Issue created: {issue_url}"
+            except Exception as e:
+                # If GitHub issue creation failed, include the error in the response
+                response_with_issue_url = f"{response}\nFailed to create GitHub issue: {str(e)}"
+        else:
+            # If parsing failed, modify the response accordingly
+            response_with_issue_url = f"{response}\nFailed to parse GitHub issue details."
+    else:
+        # If no GitHub issue information is found, use the original response
+        response_with_issue_url = response
+
+    # Format the response for Slack, mentioning the user if necessary
+    if user_id != '@U06KCGTFTC4' and not summary:
+        response_to_send = f'<@{user_id}>: {response_with_issue_url}'
+    else:
+        response_to_send = response_with_issue_url
+
+    # Convert any Markdown bold syntax from LLM response, if applicable
+    converted_text = response_to_send.replace('**', '*')
+    markdown_blocks = markdown_blocks_simple(converted_text)
+
+    # Post the message back to Slack
+    app.client.chat_postMessage(channel=channel_id, blocks=markdown_blocks)
+
+
+# def long_running_task(channel_id,
+#                       user_id,
+#                       msg,
+#                       summary=False
+#                       ):
+#
+#     response = conversation.predict(input=msg)
+#
+#     # add user_id to the response to @ them
+#     if user_id != '@U06KCGTFTC4' and not summary:  # kegsofduff
+#         response = f'<@{user_id}>: {response}'
+#
+#     converted_text = response.replace('**', '*')
+#     markdown = markdown_blocks_simple(converted_text)
+#
+#     app.client.chat_postMessage(channel=channel_id, blocks=markdown)
+
+
+##
+# issue_details = parse_github_issue_from_llm_response(llm_response_updated)
+#
+# if issue_details:
+#     github_token = "YOUR_GITHUB_TOKEN_HERE"
+#     repo_owner = "YOUR_REPO_OWNER"
+#     repo_name = "YOUR_REPO_NAME"
+#
+#     try:
+#         # Use the parsed issue details to create a GitHub issue
+#         issue_url = create_github_issue(github_token, repo_owner, repo_name, issue_details)
+#         print(f"Issue created successfully: {issue_url}")
+#         # Here you can proceed to share the issue URL back via Slack
+#     except Exception as e:
+#         print(str(e))
+#         # Handle the error appropriately (e.g., send a failure message back to Slack)
+# else:
+#     print("Issue details could not be parsed. Unable to create GitHub issue.")
 
 def wake_up():
     global is_sleeping
